@@ -52,3 +52,8 @@ eb codesource
 mkdir .ebextensions
 touch .ebextensions/001_envar.config
 ```
+
+## Create EB environment
+```sh
+eb create --single
+```
