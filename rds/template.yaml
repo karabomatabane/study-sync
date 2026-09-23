@@ -24,7 +24,7 @@ Parameters:
     AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
     ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
   DBInstanceClass:
-    Default: db.m5.large
+    Default: db.t3.micro
     Description: DB instance class
     Type: String
     ConstraintDescription: Must select a valid DB instance type.
@@ -35,7 +35,45 @@ Parameters:
     MinValue: "20"
     MaxValue: "65536"
     ConstraintDescription: must be between 20 and 65536 GiB.
+  VpcId:
+    Type: String
+    Description: VPC ID
+  WebServerSGGroupId:
+    Type: String
+  Subnets:
+    Type: CommaDelimitedList
+    Description: List of subnets for the DB subnet group
 Resources:
+  RDSMonitoringRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: monitoring.rds.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+
+  RDSPostgresSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "Security Group for RDS Instance"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref WebServerSGGroupId
+      VpcId: !Ref VpcId
+
+  MyDBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: Subnets for the RDS instance
+      SubnetIds: !Ref Subnets
+
   MyDB:
     Type: "AWS::RDS::DBInstance"
     Properties:
@@ -43,9 +81,12 @@ Resources:
       DBName: !Ref DBName
       DBInstanceClass: !Ref DBInstanceClass
       AllocatedStorage: !Ref DBAllocatedStorage
-      Engine: MySQL
-      EngineVersion: "8.0.33"
+      Engine: postgres
+      EngineVersion: "13.23"
       MasterUsername: postgres
       MasterUserPassword: Testing123456!
       MonitoringInterval: 60
-      MonitoringRoleArn: "arn:aws:iam::123456789012:role/rds-monitoring-role"
+      MonitoringRoleArn: !GetAtt RDSMonitoringRole.Arn
+      VPCSecurityGroups:
+        - !GetAtt RDSPostgresSG.GroupId
+      DBSubnetGroupName: !Ref MyDBSubnetGroup
